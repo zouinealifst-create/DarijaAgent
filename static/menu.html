@@ -93,6 +93,10 @@
 
   <script>
     async function logout() {
+      // Clear all localStorage to prevent new users from seeing old chat history
+      localStorage.removeItem('darija_conversations');
+      localStorage.removeItem('darija_active_chat');
+      sessionStorage.clear();
       await fetch('/api/logout', { method:'POST', credentials:'include' });
       window.location.href = '/';
     }

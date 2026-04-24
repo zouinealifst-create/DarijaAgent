@@ -74,9 +74,8 @@
     if (!history) {
       document.getElementById('summary-content').innerHTML = '<p style="text-align:center;color:#555">No conversation found. <a href="/chat" style="color:#c1440e">Start chatting first!</a></p>';
     } else {
-      // Timeout controller — abort if taking longer than 20s
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 20000);
+      const timeout = setTimeout(() => controller.abort(), 15000);
 
       fetch('/api/summary',{
         method:'POST', credentials:'include',
@@ -89,7 +88,7 @@
           document.getElementById('summary-content').innerHTML=`<p style="color:#e74c3c">${data.error}</p>`;
         } else {
           document.getElementById('summary-content').innerHTML=`<div class="summary-card">${data.summary}</div>`;
-          sessionStorage.removeItem('chatHistory');
+          // NOTE: chatHistory is kept in sessionStorage so page refresh still works
         }
       }).catch(err=>{
         clearTimeout(timeout);

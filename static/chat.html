@@ -25,9 +25,7 @@
     .close-sidebar { background:none; border:none; color:#666; cursor:pointer; font-size:1.2rem; }
     .close-sidebar:hover { color:#fff; }
 
-    .history-list {
-      flex:1; overflow-y:auto; padding:8px;
-    }
+    .history-list { flex:1; overflow-y:auto; padding:8px; }
     .history-item {
       padding:12px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05);
       border-radius:8px; margin-bottom:8px; cursor:pointer;
@@ -38,10 +36,7 @@
     .history-item.active { background:rgba(193,68,14,0.15); border-color:#c1440e; color:#fff; }
     .history-time { font-size:0.7rem; color:#555; display:block; margin-top:4px; }
 
-    .sidebar-footer {
-      padding:12px; border-top:1px solid #1e1e2a;
-      display:flex; gap:8px;
-    }
+    .sidebar-footer { padding:12px; border-top:1px solid #1e1e2a; display:flex; gap:8px; }
     .new-chat-btn {
       flex:1; padding:10px; background:#c1440e; color:#fff;
       border:none; border-radius:8px; cursor:pointer; font-weight:600;
@@ -51,8 +46,7 @@
     .delete-history-btn {
       padding:10px 14px; background:rgba(255,107,107,0.15); color:#ff6b6b;
       border:1px solid rgba(255,107,107,0.3); border-radius:8px;
-      cursor:pointer; font-weight:600; font-size:1.1rem;
-      transition:all 0.2s;
+      cursor:pointer; font-weight:600; font-size:1.1rem; transition:all 0.2s;
     }
     .delete-history-btn:hover { background:rgba(255,107,107,0.25); border-color:#ff6b6b; }
 
@@ -70,6 +64,8 @@
       text-decoration:none; transition:all 0.2s;
     }
     .history-toggle:hover { border-color:#c1440e; color:#c1440e; }
+    .history-toggle.hidden-auth { display:none !important; }
+    #sidebar.hidden-auth { display:none !important; }
     .back-btn {
       padding:6px 14px; border:1px solid #333; border-radius:20px;
       color:#888; background:transparent; cursor:pointer; font-size:0.8rem;
@@ -128,29 +124,29 @@
   <!-- History Sidebar -->
   <div id="sidebar" class="hidden">
     <div class="sidebar-header">
-      <span class="sidebar-title">📚 Chat History</span>
-      <button class="close-sidebar" onclick="toggleSidebar()">✕</button>
+      <span class="sidebar-title">&#x1F4DA; Chat History</span>
+      <button class="close-sidebar" onclick="toggleSidebar()">&#x2715;</button>
     </div>
     <div class="history-list" id="history-list"></div>
     <div class="sidebar-footer">
       <button class="new-chat-btn" onclick="newChat()">+ New Chat</button>
-      <button class="delete-history-btn" onclick="deleteAllHistory()" title="Delete all history">🗑️</button>
+      <button class="delete-history-btn" onclick="deleteAllHistory()" title="Delete all history">&#x1F5D1;&#xFE0F;</button>
     </div>
   </div>
 
   <div class="main-chat">
     <header>
       <div class="header-left">
-        <button class="history-toggle" onclick="toggleSidebar()">📚 History</button>
-        <a href="/menu" class="back-btn">← Menu</a>
-        <div class="header-title">🇲🇦 Darija <span>Chat</span></div>
+        <button class="history-toggle hidden-auth" id="history-btn" onclick="toggleSidebar()">&#x1F4DA; History</button>
+        <a href="/menu" class="back-btn">&#x2190; Menu</a>
+        <div class="header-title">&#x1F1F2;&#x1F1E6; Darija <span>Chat</span></div>
       </div>
-      <button class="end-btn" onclick="endSession()">End & Get Summary</button>
+      <button class="end-btn" onclick="endSession()">End &amp; Get Summary</button>
     </header>
 
     <div id="chat-box">
       <div class="welcome-msg" id="welcome">
-        <div class="big">🗣️</div>
+        <div class="big">&#x1F5E3;&#xFE0F;</div>
         <h2>Merhba! Ask me anything about Morocco or Darija.</h2>
         <p>Try one of these to start:</p>
         <div class="suggestions" style="justify-content:center; margin-top:16px;">
@@ -169,28 +165,37 @@
   </div>
 
   <script>
-    const chatBox = document.getElementById('chat-box');
-    const input   = document.getElementById('msg-input');
-    const btn     = document.getElementById('send-btn');
-    const sidebar = document.getElementById('sidebar');
+    const chatBox     = document.getElementById('chat-box');
+    const input       = document.getElementById('msg-input');
+    const btn         = document.getElementById('send-btn');
+    const sidebar     = document.getElementById('sidebar');
     const historyList = document.getElementById('history-list');
-    
-    let history   = [];
+
+    // ── Storage keys ─────────────────────────────────────────────────────────
+    const LS_CONVERSATIONS = 'darija_conversations';
+    const LS_ACTIVE_KEY    = 'darija_active_chat';
+    const SS_GUEST_KEY     = 'darija_guest_chat';   // sessionStorage: survives refresh, dies on tab close
+
+    // ── State ─────────────────────────────────────────────────────────────────
+    let history       = [];     // ["You: ...", "Expert: ..."]
     let currentChatId = null;
     let conversations = {};
+    let isGuest       = false;  // set after /api/me resolves
 
-    // Load conversations from localStorage
+    // ═════════════════════════════════════════════════════════════════════════
+    // A — Authenticated helpers  (localStorage — persists across sessions)
+    // ═════════════════════════════════════════════════════════════════════════
+
     function loadConversations() {
-      const saved = localStorage.getItem('darija_conversations');
-      conversations = saved ? JSON.parse(saved) : {};
+      try {
+        const raw = localStorage.getItem(LS_CONVERSATIONS);
+        conversations = raw ? JSON.parse(raw) : {};
+      } catch { conversations = {}; }
       renderHistory();
     }
 
-    // Save current conversation to localStorage
     function saveConversation() {
-      if (!currentChatId) {
-        currentChatId = 'chat_' + Date.now();
-      }
+      if (!currentChatId) currentChatId = 'chat_' + Date.now();
       const firstMsg = history[0] ? history[0].substring(0, 40) : 'Chat';
       conversations[currentChatId] = {
         id: currentChatId,
@@ -198,15 +203,64 @@
         timestamp: new Date().toLocaleString(),
         messages: [...history]
       };
-      localStorage.setItem('darija_conversations', JSON.stringify(conversations));
+      try {
+        localStorage.setItem(LS_CONVERSATIONS, JSON.stringify(conversations));
+        localStorage.setItem(LS_ACTIVE_KEY, currentChatId);
+      } catch {}
       renderHistory();
     }
 
-    // Render history list in sidebar
+    function restoreActiveChat() {
+      const savedId = localStorage.getItem(LS_ACTIVE_KEY);
+      if (savedId && conversations[savedId]) {
+        loadConversation(savedId, false);
+        return;
+      }
+      const sorted = Object.values(conversations)
+        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      if (sorted.length > 0) loadConversation(sorted[0].id, false);
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // B — Guest helpers  (sessionStorage — survives refresh, clears on nav)
+    // ═════════════════════════════════════════════════════════════════════════
+
+    function saveGuestSession() {
+      try { sessionStorage.setItem(SS_GUEST_KEY, JSON.stringify(history)); } catch {}
+    }
+
+    function restoreGuestSession() {
+      try {
+        const raw = sessionStorage.getItem(SS_GUEST_KEY);
+        if (!raw) return;
+        const msgs = JSON.parse(raw);
+        if (!msgs || !msgs.length) return;
+        history = msgs;
+        chatBox.innerHTML = '';
+        msgs.forEach(msg => {
+          if (msg.startsWith('You:'))         addMsg('user', msg.substring(5).trim());
+          else if (msg.startsWith('Expert:')) addMsg('bot',  msg.substring(8).trim());
+        });
+      } catch {}
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // C — Unified save dispatcher
+    // ═════════════════════════════════════════════════════════════════════════
+
+    function persistCurrent() {
+      if (isGuest) saveGuestSession();
+      else         saveConversation();
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // D — History sidebar  (authenticated only)
+    // ═════════════════════════════════════════════════════════════════════════
+
     function renderHistory() {
       historyList.innerHTML = '';
-      if (Object.keys(conversations).length === 0) {
-        historyList.innerHTML = '<div style="padding:16px; color:#555; font-size:0.8rem;">No conversations yet. Start chatting!</div>';
+      if (!Object.keys(conversations).length) {
+        historyList.innerHTML = '<div style="padding:16px;color:#555;font-size:0.8rem;">No conversations yet. Start chatting!</div>';
         return;
       }
       Object.values(conversations)
@@ -214,153 +268,212 @@
         .forEach(conv => {
           const item = document.createElement('div');
           item.className = 'history-item' + (currentChatId === conv.id ? ' active' : '');
-          item.innerHTML = `<div>${conv.title}...</div><span class="history-time">${conv.timestamp}</span>`;
+          item.innerHTML = '<div>' + conv.title + '...</div><span class="history-time">' + conv.timestamp + '</span>';
           item.onclick = () => loadConversation(conv.id);
           historyList.appendChild(item);
         });
     }
 
-    // Load a conversation
-    function loadConversation(chatId) {
+    // closeSidebar=true  -> user picked a history item, close the panel
+    // closeSidebar=false -> page restore, leave sidebar untouched
+    function loadConversation(chatId, closeSidebar) {
+      if (closeSidebar === undefined) closeSidebar = true;
       const conv = conversations[chatId];
       if (!conv) return;
-      
       currentChatId = chatId;
-      history = [...conv.messages];
-      
-      // Clear chat box
+      history = conv.messages.slice();
       chatBox.innerHTML = '';
-      
-      // Render all messages
       conv.messages.forEach(msg => {
-        if (msg.startsWith('You:')) {
-          addMsg('user', msg.substring(5).trim());
-        } else if (msg.startsWith('Expert:')) {
-          addMsg('bot', msg.substring(8).trim());
-        }
+        if (msg.startsWith('You:'))         addMsg('user', msg.substring(5).trim());
+        else if (msg.startsWith('Expert:')) addMsg('bot',  msg.substring(8).trim());
       });
-      
-      toggleSidebar(); // Close sidebar after selecting
+      if (closeSidebar && !sidebar.classList.contains('hidden')) toggleSidebar();
       renderHistory();
     }
 
-    // New chat
     function newChat() {
-      if (history.length > 0) saveConversation();
+      if (history.length > 0) persistCurrent();
       history = [];
       currentChatId = null;
-      chatBox.innerHTML = `
-        <div class="welcome-msg" id="welcome">
-          <div class="big">🗣️</div>
-          <h2>Merhba! Ask me anything about Morocco or Darija.</h2>
-          <p>Try one of these to start:</p>
-          <div class="suggestions" style="justify-content:center; margin-top:16px;">
-            <span class="chip" onclick="send('How do Moroccans greet each other?')">How do Moroccans greet each other?</span>
-            <span class="chip" onclick="send('What does labas mean?')">What does labas mean?</span>
-            <span class="chip" onclick="send('How to order food in Morocco?')">How to order food in Morocco?</span>
-            <span class="chip" onclick="send('Teach me Moroccan numbers')">Teach me Moroccan numbers</span>
-          </div>
-        </div>
-      `;
+      chatBox.innerHTML = '<div class="welcome-msg" id="welcome">'
+        + '<div class="big">&#x1F5E3;&#xFE0F;</div>'
+        + '<h2>Merhba! Ask me anything about Morocco or Darija.</h2>'
+        + '<p>Try one of these to start:</p>'
+        + '<div class="suggestions" style="justify-content:center;margin-top:16px;">'
+        + '<span class="chip" onclick="send(\'How do Moroccans greet each other?\')">How do Moroccans greet each other?</span>'
+        + '<span class="chip" onclick="send(\'What does labas mean?\')">What does labas mean?</span>'
+        + '<span class="chip" onclick="send(\'How to order food in Morocco?\')">How to order food in Morocco?</span>'
+        + '<span class="chip" onclick="send(\'Teach me Moroccan numbers\')">Teach me Moroccan numbers</span>'
+        + '</div></div>';
       input.focus();
       renderHistory();
     }
 
-    // Delete all history
     function deleteAllHistory() {
       if (!confirm('Are you sure? This will delete ALL conversations.')) return;
       conversations = {};
-      localStorage.removeItem('darija_conversations');
+      localStorage.removeItem(LS_CONVERSATIONS);
+      localStorage.removeItem(LS_ACTIVE_KEY);
       currentChatId = null;
       history = [];
       newChat();
-      renderHistory();
     }
 
-    // Toggle sidebar
-    function toggleSidebar() {
-      sidebar.classList.toggle('hidden');
-    }
+    function toggleSidebar() { sidebar.classList.toggle('hidden'); }
 
-    input.addEventListener('keydown', e => { if(e.key==='Enter') send(); });
+    // ═════════════════════════════════════════════════════════════════════════
+    // E — Message rendering & sending
+    // ═════════════════════════════════════════════════════════════════════════
+
+    input.addEventListener('keydown', function(e) { if (e.key === 'Enter') send(); });
 
     function addMsg(role, text) {
-      document.getElementById('welcome')?.remove();
-      const wrap = document.createElement('div');
-      wrap.className = `msg ${role}`;
-      const lbl = document.createElement('div');
+      var w = document.getElementById('welcome');
+      if (w) w.remove();
+      var wrap = document.createElement('div');
+      wrap.className = 'msg ' + role;
+      var lbl = document.createElement('div');
       lbl.className = 'msg-label';
-      lbl.textContent = role==='user' ? 'You' : '🇲🇦 Darija Expert';
-      const bub = document.createElement('div');
+      lbl.textContent = role === 'user' ? 'You' : '&#x1F1F2;&#x1F1E6; Darija Expert';
+      var bub = document.createElement('div');
       bub.className = 'bubble';
       bub.textContent = text;
-      wrap.append(lbl, bub);
+      wrap.appendChild(lbl);
+      wrap.appendChild(bub);
       chatBox.appendChild(wrap);
       chatBox.scrollTop = chatBox.scrollHeight;
     }
 
     function showTyping() {
-      const w = document.createElement('div');
+      var w = document.createElement('div');
       w.className = 'msg bot'; w.id = 'typing';
-      const l = document.createElement('div');
-      l.className='msg-label'; l.textContent='🇲🇦 Darija Expert';
-      const t = document.createElement('div');
-      t.className='typing';
-      t.innerHTML='<div class="dot"></div><div class="dot"></div><div class="dot"></div>';
-      w.append(l,t); chatBox.appendChild(w);
+      var l = document.createElement('div');
+      l.className = 'msg-label'; l.textContent = 'Darija Expert';
+      var t = document.createElement('div');
+      t.className = 'typing';
+      t.innerHTML = '<div class="dot"></div><div class="dot"></div><div class="dot"></div>';
+      w.appendChild(l); w.appendChild(t);
+      chatBox.appendChild(w);
       chatBox.scrollTop = chatBox.scrollHeight;
     }
 
-    function removeTyping() { document.getElementById('typing')?.remove(); }
+    function removeTyping() {
+      var el = document.getElementById('typing');
+      if (el) el.remove();
+    }
 
     async function send(preset) {
-      const msg = preset || input.value.trim();
+      var msg = preset || input.value.trim();
       if (!msg) return;
       input.value = '';
       btn.disabled = true; input.disabled = true;
       addMsg('user', msg);
       showTyping();
-      history.push(`You: ${msg}`);
-      saveConversation();
+      history.push('You: ' + msg);
+      persistCurrent();                        // save after user message
 
       try {
-        const res = await fetch('/api/chat', {
-          method:'POST', credentials:'include',
-          headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({message: msg})
+        var res = await fetch('/api/chat', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: msg })
         });
-        const data = await res.json();
+        var data = await res.json();
         removeTyping();
-        const reply = data.error ? '⚠️ ' + data.error : data.response;
+        var reply = data.error ? 'Error: ' + data.error : data.response;
         addMsg('bot', reply);
-        history.push(`Expert: ${reply}`);
-        saveConversation();
-      } catch {
+        history.push('Expert: ' + reply);
+        persistCurrent();                      // save after AI reply
+      } catch(e) {
         removeTyping();
-        addMsg('bot','⚠️ Server error. Please try again.');
+        addMsg('bot', 'Server error. Please try again.');
       }
       btn.disabled = false; input.disabled = false; input.focus();
     }
 
     function endSession() {
-      if (history.length === 0) { alert('Start a conversation first!'); return; }
-      saveConversation();
-      // Trim history: user questions + short AI response excerpts only
-      const trimmed = history.map(line => {
-        if (line.startsWith('Expert:')) {
+      if (!history.length) { alert('Start a conversation first!'); return; }
+      persistCurrent();
+      var trimmed = history.map(function(line) {
+        if (line.startsWith('Expert:'))
           return 'Expert: ' + line.substring(8, 108).trim() + (line.length > 108 ? '...' : '');
-        }
         return line;
       });
       sessionStorage.setItem('chatHistory', trimmed.join('\n'));
       window.location.href = '/summary';
     }
 
-    // Init
-    loadConversations();
-    fetch('/api/me', {credentials:'include'})
-      .then(r=>r.json())
-      .then(d=>{ if(d.error) window.location.href='/login'; });
+    // ═════════════════════════════════════════════════════════════════════════
+    // F — Initialisation
+    //
+    // We use a sessionStorage flag 'darija_chat_tab' to tell the difference
+    // between a PAGE REFRESH (flag already present) and a FRESH NAVIGATION
+    // (flag absent — e.g. first visit after login, or clicking menu link).
+    //
+    // sessionStorage survives F5 refresh but is cleared when the user
+    // navigates away or closes the tab — exactly the semantics we need.
+    //
+    //  Refresh → restore the last active conversation
+    //  Fresh   → show clean welcome screen (history still in sidebar)
+    // ═════════════════════════════════════════════════════════════════════════
+
+    var CHAT_TAB_KEY  = 'darija_chat_tab';
+    var LAST_USER_KEY = 'darija_last_user';
+    var isRefresh     = sessionStorage.getItem(CHAT_TAB_KEY) === '1';
+    sessionStorage.setItem(CHAT_TAB_KEY, '1');   // mark for future refreshes
+
+    // Check user identity FIRST before loading any conversations
+    fetch('/api/me', { credentials: 'include' })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.error) {
+          window.location.href = '/login';
+          return;
+        }
+
+        if (d.id && d.id !== 'guest') {
+          // ── Authenticated user ────────────────────────────────────────
+          isGuest = false;
+          document.getElementById('history-btn').classList.remove('hidden-auth');
+          
+          // Check if user changed BEFORE loading conversations
+          var lastUser = localStorage.getItem(LAST_USER_KEY);
+          if (lastUser && lastUser !== d.id) {
+            // NEW USER DETECTED - Clear all old data IMMEDIATELY
+            console.log('User changed from', lastUser, 'to', d.id, '- clearing old history');
+            localStorage.clear();  // Nuclear option: clear all localStorage
+            sessionStorage.clear(); // Clear session too
+            conversations = {};
+            currentChatId = null;
+            history = [];
+            isRefresh = false;
+          }
+          
+          // Remember current user
+          localStorage.setItem(LAST_USER_KEY, d.id);
+          
+          // NOW load conversations (safe - user is verified and old data cleared if needed)
+          loadConversations();
+          
+          if (isRefresh) {
+            // Refreshed the tab → put them back where they were
+            restoreActiveChat();
+          }
+          // Fresh navigation → show welcome screen; history is in sidebar
+        } else {
+          // ── Guest user ───────────────────────────────────────────────
+          isGuest = true;
+          sidebar.classList.add('hidden-auth');          // lock sidebar
+          
+          // NOW load conversations for guest
+          loadConversations();
+          
+          if (isRefresh) {
+            restoreGuestSession();                       // sessionStorage restore
+          }
+          // Fresh guest visit → clean welcome screen
+        }
+      });
   </script>
 </body>
 </html>

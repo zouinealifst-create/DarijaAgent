@@ -64,6 +64,15 @@ def run_crew_with_retry(crew, max_retries=2, base_delay=0.5):
                     continue
             raise
 
+# ─── Chat Response Cache (simple in-memory cache to reduce API calls) ─────────
+import hashlib
+_chat_cache = {}
+
+def _cache_key(message):
+    """Generate a cache key from message hash (case-insensitive)."""
+    normalized = message.lower().strip()
+    return hashlib.md5(normalized.encode()).hexdigest()
+
 # ─── Local JSON Helpers (fallback) ───────────────────────────────────────────
 USERS_FILE = "auth/users.json"
 
@@ -491,37 +500,53 @@ def chat():
     message = sanitize(data.get("message", ""))
     if not message:
         return jsonify({"error": "Empty message"}), 400
+    
+    # Check cache first to reduce API calls
+    cache_key = _cache_key(message)
+    if cache_key in _chat_cache:
+        log_step(f"Cache HIT for: {message[:40]}...")
+        return jsonify({"response": _chat_cache[cache_key]})
+    
     try:
         # ── Direct OpenRouter API call — bypasses CrewAI's 500-1000 token overhead ──
         import openai as _openai
         from agents import lookup_darija
         kb_match = lookup_darija(message)
-        kb_note  = f"\nKB fact: {kb_match}" if kb_match else ""
+        kb_note  = f" KB: {kb_match}" if kb_match else ""
 
         _client = _openai.OpenAI(
             api_key=os.getenv("OPENROUTER_API_KEY"),
             base_url="https://openrouter.ai/api/v1"
         )
+        # OPTIMIZATION: Reduced max_tokens to 200 + added timeout + simplified prompt
         completion = _client.chat.completions.create(
             model="google/gemma-4-31b-it",
             messages=[
                 {
                     "role": "user",
                     "content": (
-                        "You are a friendly Moroccan Darija expert. "
-                        "Answer in English, weave in 2-3 Darija words with translations in parentheses. "
-                        "If a KB fact is given, use it. End every reply with 'Pro Cultural Tip:' and one sentence."
-                        f"\n\nUser question: {message}{kb_note}"
+                        "Expert in Darija. Answer in English + 2 Darija words (in parentheses). Brief. End with 1 tip."
+                        f"{kb_note}\n\nQ: {message}"
                     )
                 }
             ],
-            max_tokens=400,
+            max_tokens=200,
             temperature=0.7,
+            timeout=15.0,
         )
         response = completion.choices[0].message.content
+        
+        # Cache the response for repeated questions
+        _chat_cache[cache_key] = response
+        log_step(f"Response cached (tokens: {len(response.split())} words)")
+        
         return jsonify({"response": response})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        error_msg = str(e)
+        log_step(f"Chat error: {error_msg}")
+        if "timeout" in error_msg.lower() or "429" in error_msg:
+            return jsonify({"error": "Server busy. Try again in a moment."}), 503
+        return jsonify({"error": "AI unavailable"}), 500
 
 
 @app.route("/api/quiz", methods=["POST"])
@@ -556,28 +581,29 @@ def summary():
             api_key=os.getenv("OPENROUTER_API_KEY"),
             base_url="https://openrouter.ai/api/v1"
         )
+        # OPTIMIZATION: Reduced max_tokens to 150 and simplified prompt
         completion = _client.chat.completions.create(
             model="google/gemma-4-31b-it",
             messages=[
                 {
                     "role": "user",
                     "content": (
-                        "You are an encouraging Moroccan language teacher.\n"
-                        "Here is the full conversation the user had:\n\n"
-                        f"{history}\n\n"
-                        "Write a warm, encouraging summary (200 words max) covering:\n"
-                        "1. The Darija words and expressions they encountered\n"
-                        "2. The cultural tips they learned\n"
-                        "3. A motivational closing message to keep learning"
+                        "Summarize this Darija lesson in 80 words: Darija words learned, 1 cultural tip, motivation. Warm tone.\n\n"
+                        f"{history}"
                     )
                 }
             ],
-            max_tokens=350,
-            temperature=0.6,
+            max_tokens=150,
+            temperature=0.5,
+            timeout=15.0,
         )
         result = completion.choices[0].message.content
         return jsonify({"summary": result})
     except Exception as e:
+        error_msg = str(e)
+        log_step(f"Summary error: {error_msg}")
+        if "timeout" in error_msg.lower() or "429" in error_msg:
+            return jsonify({"error": "Summary generation busy. Please try again."}), 503
         return jsonify({"error": str(e)}), 500
 
 

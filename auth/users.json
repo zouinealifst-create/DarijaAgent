@@ -5,6 +5,36 @@
       "name": "Test User",
       "email": "test@example.com",
       "password": "password123"
+    },
+    {
+      "id": 2,
+      "name": "Tarchi Oussama",
+      "email": "oussama.tr05@gmail.com",
+      "password": null,
+      "auth_provider": "google",
+      "google_sub": "114770530410908384469",
+      "avatar": "https://lh3.googleusercontent.com/a/ACg8ocKNEqF_THy_z4Mnpasf7hV_tyigtAiSNeKrDORFf15H0RPBE6k=s96-c"
+    },
+    {
+      "id": 3,
+      "name": "simo",
+      "email": "simo12@gmail.com",
+      "password": "Anahowa12#",
+      "auth_provider": "manual"
+    },
+    {
+      "id": 4,
+      "name": "khalid",
+      "email": "khali32@gmail.com",
+      "password": "Khalid12#",
+      "auth_provider": "manual"
+    },
+    {
+      "id": 5,
+      "name": "deja",
+      "email": "deja32@gmail.com",
+      "password": "Simo32@44",
+      "auth_provider": "manual"
     }
   ]
 }
