@@ -12,7 +12,15 @@ pinned: false
 
 An AI-powered web app that teaches Moroccan Darija through real conversations, quizzes, and cultural insights.
 
-Built by **Team DarijaAI** — Oussama Tarchi · Ali Zouine · Taha Rajel
+---
+
+## 👥 Team DarijaAI
+
+| Name | GitHub |
+|------|--------|
+| **Tarchi Oussama** | [@tarchi983](https://github.com/tarchi983) |
+| **Ali Zouine** | [@zouinealifst-create](https://github.com/zouinealifst-create) |
+| **Taha Rajel** | [@Taha-Rajel](https://github.com/Taha-Rajel) |
 
 ---
 
