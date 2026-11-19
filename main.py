@@ -1,29 +1,6 @@
-'''from crewai import Crew, Process
-from agents import scraper_agent, linguist_agent, coach_agent
-from tasks import scrape_task, analyze_task, coach_task
-
-darija_crew = Crew(
-    agents=[scraper_agent, linguist_agent, coach_agent],
-    tasks=[scrape_task, analyze_task, coach_task],
-    process=Process.sequential,
-    verbose=True,
-)
-
-if __name__ == "__main__":
-    print("🚀 Starting the Darija AI Immersion System...\n")
-    
-    result = darija_crew.kickoff()
-    
-    print("\n" + "="*50)
-    print("🎯 FINAL DARIJA LESSON")
-    print("="*50 + "\n")
-    print(result)l'''
-
-
 from crewai import Crew, Process
 from agents import darija_expert_agent, cultural_coach_agent
 from tasks import create_tasks
-
 
 def run_darija_chat(user_question: str):
     answer_task, tip_task = create_tasks(user_question)
